@@ -43,10 +43,21 @@ export function HighlightLayer({
       textNodes.push(node as Text);
     }
 
-    // Build concatenated text + offset map
+    // Build concatenated text + offset map.
+    // Insert a virtual space between text nodes from different block-level
+    // parents (e.g., different <td>, <p>, <h2>) so that table cell text
+    // doesn't merge into one unsearchable string.
     let fullText = "";
     const nodeOffsets: { node: Text; start: number; end: number }[] = [];
+    let lastBlock: Element | null = null;
+
     for (const tn of textNodes) {
+      const block = getBlockAncestor(tn);
+      if (lastBlock && block !== lastBlock) {
+        fullText += " "; // virtual space — not mapped to any text node
+      }
+      lastBlock = block;
+
       const content = tn.textContent || "";
       nodeOffsets.push({ node: tn, start: fullText.length, end: fullText.length + content.length });
       fullText += content;
@@ -170,14 +181,38 @@ function getRangeRects(
 }
 
 /**
- * Strip markdown inline formatting: **, *, __, _, `, ~~
+ * Strip markdown formatting (both block-level and inline) to approximate DOM text.
+ * This bridges the gap between raw markdown anchors and rendered DOM content.
  */
-function stripMarkdownInline(s: string): string {
+function stripMarkdown(s: string): string {
   return s
+    // Block-level: heading markers
+    .replace(/^#{1,6}\s+/gm, "")
+    // Block-level: table pipes (leading, trailing, and separators)
+    .replace(/^\||\|$/gm, "")
+    .replace(/\|/g, " ")
+    // Block-level: table separator rows (e.g., |---|---|)
+    .replace(/^[\s|:-]+$/gm, "")
+    // Block-level: list markers
+    .replace(/^(\s*)[-*+]\s+/gm, "$1")
+    .replace(/^(\s*)\d+\.\s+/gm, "$1")
+    // Block-level: blockquote markers
+    .replace(/^>\s?/gm, "")
+    // Block-level: horizontal rules
+    .replace(/^[-*_]{3,}\s*$/gm, "")
+    // Inline: images ![alt](url) → alt
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    // Inline: links [text](url) → text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    // Inline: bold/italic (must be before single *)
     .replace(/(\*\*|__)(.*?)\1/g, "$2")
     .replace(/(\*|_)(.*?)\1/g, "$2")
+    // Inline: strikethrough
     .replace(/~~(.*?)~~/g, "$1")
-    .replace(/`([^`]*)`/g, "$1");
+    // Inline: code
+    .replace(/`([^`]*)`/g, "$1")
+    // Cleanup: remove any remaining lone formatting chars (from truncated selections)
+    .replace(/[`*_~]/g, "");
 }
 
 /**
@@ -192,7 +227,7 @@ function findNormalized(
     return { start: exactIdx, end: exactIdx + text.length };
   }
 
-  const stripped = stripMarkdownInline(text).replace(/\s+/g, " ").trim();
+  const stripped = stripMarkdown(text).replace(/\s+/g, " ").trim();
   if (!stripped) return null;
 
   const origPositions: number[] = [];
@@ -224,4 +259,21 @@ function findNormalized(
     : origPositions[lastMatchedIdx] + 1;
 
   return { start: origStart, end: origEnd };
+}
+
+const BLOCK_TAGS = new Set([
+  "P", "DIV", "H1", "H2", "H3", "H4", "H5", "H6",
+  "LI", "TD", "TH", "TR", "BLOCKQUOTE", "PRE", "SECTION", "ARTICLE",
+]);
+
+/**
+ * Walk up from a text node to find its nearest block-level ancestor.
+ */
+function getBlockAncestor(node: Node): Element | null {
+  let el = node.parentElement;
+  while (el) {
+    if (BLOCK_TAGS.has(el.tagName)) return el;
+    el = el.parentElement;
+  }
+  return null;
 }

@@ -74,7 +74,7 @@ export function SelectionHandler({
       ref={popoverRef}
       className="fixed z-50 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg"
       style={{
-        top: captured.rect.bottom + 8,
+        top: Math.min(captured.rect.bottom + 8, window.innerHeight - (showForm ? 200 : 48)),
         left: Math.max(8, Math.min(captured.rect.left, window.innerWidth - 320)),
       }}
       onMouseDown={(e) => e.stopPropagation()}
