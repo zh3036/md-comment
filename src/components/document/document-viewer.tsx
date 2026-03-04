@@ -92,7 +92,7 @@ export function DocumentViewer({
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-64px)]">
+    <div className="flex h-full">
       {/* Markdown content — 65% */}
       <div className="flex-1 overflow-auto" style={{ flex: "0 0 65%" }}>
         <div

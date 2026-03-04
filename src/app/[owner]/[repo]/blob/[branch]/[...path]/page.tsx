@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createOctokit } from "@/lib/github/client";
 import { fetchFileContent, checkWriteAccess } from "@/lib/github/files";
 import { DocumentViewer } from "@/components/document/document-viewer";
+import { FileSidebar } from "@/components/document/file-sidebar";
 import Link from "next/link";
 
 interface PageProps {
@@ -102,18 +103,28 @@ export default async function DocumentPage({ params }: PageProps) {
         </div>
       </header>
 
-      {/* Document viewer */}
-      <DocumentViewer
-        owner={owner}
-        repo={repo}
-        branch={branch}
-        filePath={filePath}
-        content={fileContent}
-        commitSha={commitSha}
-        canWrite={canWrite}
-        userLogin={session.user.login ?? session.user.name ?? "anonymous"}
-        userAvatar={session.user.image ?? ""}
-      />
+      {/* Document viewer with file sidebar */}
+      <div className="flex h-[calc(100vh-64px)] relative">
+        <FileSidebar
+          owner={owner}
+          repo={repo}
+          branch={branch}
+          filePath={filePath}
+        />
+        <div className="flex-1 min-w-0">
+          <DocumentViewer
+            owner={owner}
+            repo={repo}
+            branch={branch}
+            filePath={filePath}
+            content={fileContent}
+            commitSha={commitSha}
+            canWrite={canWrite}
+            userLogin={session.user.login ?? session.user.name ?? "anonymous"}
+            userAvatar={session.user.image ?? ""}
+          />
+        </div>
+      </div>
     </div>
   );
 }
