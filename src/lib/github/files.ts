@@ -5,6 +5,8 @@ export interface FileContent {
   sha: string;
   path: string;
   encoding: string;
+  /** The commit SHA this file was fetched from */
+  commitSha: string;
 }
 
 /**
@@ -19,6 +21,17 @@ export async function fetchFileContent(
   branch: string
 ): Promise<FileContent> {
   try {
+    // Resolve branch/ref to a commit SHA
+    const { data: refData } = await octokit.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+    }).catch(() =>
+      // Fallback: branch might be a tag or commit SHA
+      octokit.git.getRef({ owner, repo, ref: `tags/${branch}` })
+    ).catch(() => ({ data: { object: { sha: branch } } }));
+    const commitSha = refData.object.sha;
+
     const { data } = await octokit.repos.getContent({
       owner,
       repo,
@@ -36,6 +49,7 @@ export async function fetchFileContent(
         sha: data.sha,
         path: data.path,
         encoding: "utf-8",
+        commitSha,
       };
     }
 
@@ -51,6 +65,7 @@ export async function fetchFileContent(
       sha: data.sha,
       path: data.path,
       encoding: "utf-8",
+      commitSha,
     };
   } catch (error: unknown) {
     if (error && typeof error === "object" && "status" in error && error.status === 404) {

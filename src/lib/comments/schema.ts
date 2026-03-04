@@ -11,6 +11,7 @@ const commentAnchorSchema = z.object({
   suffix: z.string(),
   startOffset: z.number(),
   endOffset: z.number(),
+  commitSha: z.string().optional(),
 });
 
 const commentReplySchema = z.object({
@@ -30,7 +31,15 @@ const commentSchema = z.object({
   replies: z.array(commentReplySchema),
 });
 
+const commentFileMetadataSchema = z.object({
+  repo: z.string(),
+  branch: z.string(),
+  filePath: z.string(),
+  url: z.string(),
+});
+
 export const commentFileSchema = z.object({
   version: z.number(),
+  metadata: commentFileMetadataSchema.optional(),
   comments: z.array(commentSchema),
 });

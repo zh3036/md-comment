@@ -1,8 +1,9 @@
 import type { Octokit } from "@octokit/rest";
 import { COMMENTS_BRANCH } from "./comments-branch";
-import type { CommentFile } from "../comments/types";
+import type { CommentFile, CommentFileMetadata } from "../comments/types";
 import { commentFileSchema } from "../comments/schema";
 import { mergeCommentFiles } from "../comments/merge";
+import { renderCommentsMarkdown } from "../comments/render-markdown";
 
 const EMPTY_COMMENT_FILE: CommentFile = { version: 1, comments: [] };
 
@@ -17,6 +18,10 @@ interface CommentFileWithSha {
  */
 function commentPath(filePath: string): string {
   return `comments/${filePath}.json`;
+}
+
+function commentMarkdownPath(filePath: string): string {
+  return `comments/${filePath}.md`;
 }
 
 /**
@@ -58,6 +63,7 @@ export async function readComments(
 /**
  * Write the comment file with optimistic concurrency.
  * If a 409 conflict occurs, fetches the remote version, merges, and retries.
+ * Optionally attaches metadata and writes a human-readable .md file alongside.
  */
 export async function writeComments(
   octokit: Octokit,
@@ -66,8 +72,14 @@ export async function writeComments(
   filePath: string,
   commentFile: CommentFile,
   sha: string | null,
+  metadata?: CommentFileMetadata,
   maxRetries = 3
 ): Promise<void> {
+  // Attach metadata if provided
+  if (metadata) {
+    commentFile = { ...commentFile, metadata };
+  }
+
   const path = commentPath(filePath);
   const content = Buffer.from(
     JSON.stringify(commentFile, null, 2)
@@ -88,6 +100,10 @@ export async function writeComments(
       }
 
       await octokit.repos.createOrUpdateFileContents(params);
+
+      // Best-effort: write human-readable markdown alongside JSON
+      await writeReadableMarkdown(octokit, owner, repo, filePath, commentFile).catch(() => {});
+
       return;
     } catch (error: unknown) {
       if (
@@ -107,4 +123,50 @@ export async function writeComments(
       throw error;
     }
   }
+}
+
+/**
+ * Write (or update) the human-readable .md file on the comments branch.
+ * Best-effort — failures are silently ignored by the caller.
+ */
+async function writeReadableMarkdown(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  filePath: string,
+  commentFile: CommentFile
+): Promise<void> {
+  const mdPath = commentMarkdownPath(filePath);
+  const markdown = renderCommentsMarkdown(commentFile);
+  const content = Buffer.from(markdown).toString("base64");
+
+  // Try to get existing file SHA for update
+  let existingSha: string | undefined;
+  try {
+    const { data } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path: mdPath,
+      ref: COMMENTS_BRANCH,
+    });
+    if (!Array.isArray(data) && data.type === "file") {
+      existingSha = data.sha;
+    }
+  } catch {
+    // File doesn't exist yet — will create
+  }
+
+  const params: Parameters<Octokit["repos"]["createOrUpdateFileContents"]>[0] = {
+    owner,
+    repo,
+    path: mdPath,
+    message: `Update readable comments for ${filePath}`,
+    content,
+    branch: COMMENTS_BRANCH,
+  };
+  if (existingSha) {
+    params.sha = existingSha;
+  }
+
+  await octokit.repos.createOrUpdateFileContents(params);
 }

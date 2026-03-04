@@ -16,6 +16,7 @@ interface DocumentViewerProps {
   branch: string;
   filePath: string;
   content: string;
+  commitSha: string;
   canWrite: boolean;
   userLogin: string;
   userAvatar: string;
@@ -27,6 +28,7 @@ export function DocumentViewer({
   branch,
   filePath,
   content,
+  commitSha,
   canWrite,
   userLogin,
   userAvatar,
@@ -60,6 +62,7 @@ export function DocumentViewer({
         offsets.startOffset,
         offsets.endOffset
       );
+      anchor.commitSha = commitSha;
 
       await addNewComment({
         author: { login: userLogin, avatarUrl: userAvatar },

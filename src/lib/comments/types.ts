@@ -9,6 +9,8 @@ export interface CommentAnchor {
   suffix: string;
   startOffset: number;
   endOffset: number;
+  /** The commit SHA of the file when this comment was created */
+  commitSha?: string;
 }
 
 export interface CommentReply {
@@ -28,8 +30,16 @@ export interface Comment {
   replies: CommentReply[];
 }
 
+export interface CommentFileMetadata {
+  repo: string;       // "owner/repo"
+  branch: string;     // source branch being viewed
+  filePath: string;   // "team/index.md"
+  url: string;        // app URL to view this file
+}
+
 export interface CommentFile {
   version: number;
+  metadata?: CommentFileMetadata;
   comments: Comment[];
 }
 

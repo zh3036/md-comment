@@ -29,6 +29,7 @@ export function mergeCommentFiles(
 
   return {
     version: Math.max(local.version, remote.version),
+    metadata: local.metadata ?? remote.metadata,
     comments: Array.from(commentMap.values()).sort(
       (a, b) => a.anchor.startOffset - b.anchor.startOffset
     ),

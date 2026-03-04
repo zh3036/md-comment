@@ -23,6 +23,7 @@ export async function fetchFile(
     content: file.content,
     sha: file.sha,
     path: file.path,
+    commitSha: file.commitSha,
     canWrite,
   };
 }

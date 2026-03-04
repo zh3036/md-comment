@@ -27,6 +27,7 @@ export default async function DocumentPage({ params }: PageProps) {
 
   let fileContent: string;
   let canWrite: boolean;
+  let commitSha: string;
 
   try {
     const [file, writeAccess] = await Promise.all([
@@ -35,6 +36,7 @@ export default async function DocumentPage({ params }: PageProps) {
     ]);
     fileContent = file.content;
     canWrite = writeAccess;
+    commitSha = file.commitSha;
   } catch (error: unknown) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -107,6 +109,7 @@ export default async function DocumentPage({ params }: PageProps) {
         branch={branch}
         filePath={filePath}
         content={fileContent}
+        commitSha={commitSha}
         canWrite={canWrite}
         userLogin={session.user.login ?? session.user.name ?? "anonymous"}
         userAvatar={session.user.image ?? ""}
