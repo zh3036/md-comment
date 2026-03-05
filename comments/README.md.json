@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "author": {
+        "login": "zh3036",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/5772057?v=4"
+      },
+      "anchor": {
+        "selectedText": "You're reading a long spec your teammate wrote",
+        "prefix": "https://md-comment.fly.dev)\n\n---\n\n## The Problem\n\n",
+        "suffix": ". At paragraph 3, you think \"this contradicts the ",
+        "startOffset": 210,
+        "endOffset": 256,
+        "commitSha": "58473448570bfed39d9e3633c4bde2f7a909c394"
+      },
+      "body": "do you think this is good hook?",
+      "id": "4fb0cb66-eac3-43e7-996a-27b69ce595e6",
+      "createdAt": "2026-03-05T16:36:33.417Z",
+      "resolved": false,
+      "replies": []
+    }
+  ],
+  "metadata": {
+    "repo": "zh3036/md-comment",
+    "branch": "main",
+    "filePath": "README.md",
+    "url": "https://md-comment.fly.dev/zh3036/md-comment/blob/main/README.md"
+  }
+}
