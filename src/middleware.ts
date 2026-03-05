@@ -6,14 +6,24 @@ export default auth((req) => {
 
   // GitHub URL prefix shortcut:
   // /https://github.com/owner/repo/blob/branch/path → /owner/repo/blob/branch/path
-  const ghPrefix = "/https://github.com/";
+  // Note: servers normalize // to / so we also match /https:/github.com/
+  const ghPrefixes = [
+    "/https://github.com/",
+    "/https:/github.com/",
+    "/http://github.com/",
+    "/http:/github.com/",
+  ];
   const ghPrefixEncoded = "/https%3A%2F%2Fgithub.com%2F";
   let strippedPath: string | null = null;
 
-  if (pathname.startsWith(ghPrefix)) {
-    strippedPath = "/" + pathname.slice(ghPrefix.length);
-  } else if (pathname.toLowerCase().startsWith(ghPrefixEncoded.toLowerCase())) {
-    strippedPath = "/" + decodeURIComponent(pathname.slice(1)).replace("https://github.com/", "");
+  for (const prefix of ghPrefixes) {
+    if (pathname.startsWith(prefix)) {
+      strippedPath = "/" + pathname.slice(prefix.length);
+      break;
+    }
+  }
+  if (!strippedPath && pathname.toLowerCase().startsWith(ghPrefixEncoded.toLowerCase())) {
+    strippedPath = "/" + decodeURIComponent(pathname.slice(1)).replace(/https?:\/\/github\.com\//, "");
   }
 
   if (strippedPath) {
