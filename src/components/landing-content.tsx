@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { getDefaultBranchAction } from "@/actions/get-default-branch";
 
 export function LandingContent() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleNavigate = () => {
+  const handleNavigate = async () => {
     setError("");
 
     // Parse GitHub URL or owner/repo/path format
@@ -19,6 +21,19 @@ export function LandingContent() {
         "Enter a GitHub URL like: https://github.com/owner/repo/blob/main/README.md"
       );
       return;
+    }
+
+    // If branch wasn't in the URL, resolve the repo's default branch
+    if (!parsed.branch) {
+      setLoading(true);
+      try {
+        parsed.branch = await getDefaultBranchAction(parsed.owner, parsed.repo);
+      } catch {
+        setError("Could not resolve default branch. Make sure you're signed in and the repo exists.");
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
     }
 
     router.push(
@@ -44,8 +59,8 @@ export function LandingContent() {
             if (e.key === "Enter") handleNavigate();
           }}
         />
-        <Button onClick={handleNavigate} disabled={!url.trim()}>
-          Open
+        <Button onClick={handleNavigate} disabled={!url.trim() || loading}>
+          {loading ? "Loading..." : "Open"}
         </Button>
       </div>
 
@@ -87,7 +102,7 @@ export function LandingContent() {
 function parseGitHubUrl(
   input: string
 ): { owner: string; repo: string; branch: string; path: string } | null {
-  // Try full GitHub URL
+  // Try full GitHub URL — branch is explicit
   const urlMatch = input.match(
     /github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)/
   );
@@ -100,13 +115,13 @@ function parseGitHubUrl(
     };
   }
 
-  // Try owner/repo/path format (assume main branch)
+  // Try owner/repo/path format — branch will be resolved via API
   const shortMatch = input.match(/^([^/]+)\/([^/]+)\/(.+)$/);
   if (shortMatch) {
     return {
       owner: shortMatch[1],
       repo: shortMatch[2],
-      branch: "main",
+      branch: "", // resolved later via getDefaultBranchAction
       path: shortMatch[3],
     };
   }

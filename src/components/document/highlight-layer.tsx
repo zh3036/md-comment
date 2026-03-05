@@ -158,14 +158,26 @@ function getRangeRects(
   let endSet = false;
 
   for (const { node: tn, start, end } of nodeOffsets) {
-    if (!startSet && matchStart >= start && matchStart < end) {
-      range.setStart(tn, matchStart - start);
-      startSet = true;
+    if (!startSet) {
+      if (matchStart >= start && matchStart < end) {
+        // Position is inside this text node
+        range.setStart(tn, matchStart - start);
+        startSet = true;
+      } else if (matchStart < start) {
+        // Position fell in a virtual-space gap — snap to start of next node
+        range.setStart(tn, 0);
+        startSet = true;
+      }
     }
-    if (startSet && !endSet && matchEnd > start && matchEnd <= end) {
-      range.setEnd(tn, matchEnd - start);
-      endSet = true;
-      break;
+    if (startSet && !endSet) {
+      if (matchEnd > start && matchEnd <= end) {
+        range.setEnd(tn, matchEnd - start);
+        endSet = true;
+        break;
+      } else if (matchEnd <= start) {
+        // End fell in a virtual-space gap — snap to end of previous node
+        break;
+      }
     }
   }
 

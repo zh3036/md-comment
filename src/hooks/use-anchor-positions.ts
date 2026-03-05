@@ -39,6 +39,10 @@ export function useAnchorPositions(
       const newPositions: AnchorPosition[] = [];
 
       for (const comment of comments) {
+        // Resolved comments don't have highlights rendered — skip them
+        // so they don't get falsely marked as "orphaned"
+        if (comment.resolved) continue;
+
         const highlight = cont.querySelector(
           `[data-comment-id="${comment.id}"]`
         );
