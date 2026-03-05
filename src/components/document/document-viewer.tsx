@@ -9,6 +9,7 @@ import { useComments } from "@/hooks/use-comments";
 import { useTextSelection } from "@/hooks/use-text-selection";
 import { useAnchorPositions } from "@/hooks/use-anchor-positions";
 import { createAnchor, findSelectionInRawMarkdown } from "@/lib/anchoring/create-anchor";
+import { forkAndComment } from "@/actions/save-comment";
 
 interface DocumentViewerProps {
   owner: string;
@@ -20,6 +21,8 @@ interface DocumentViewerProps {
   canWrite: boolean;
   userLogin: string;
   userAvatar: string;
+  commentTarget: { owner: string; repo: string };
+  hasFork: boolean;
 }
 
 export function DocumentViewer({
@@ -32,7 +35,10 @@ export function DocumentViewer({
   canWrite,
   userLogin,
   userAvatar,
+  commentTarget,
+  hasFork,
 }: DocumentViewerProps) {
+  const canComment = canWrite || hasFork;
   const markdownRef = useRef<HTMLDivElement>(null);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
 
@@ -43,10 +49,12 @@ export function DocumentViewer({
     addNewReply,
     toggleResolve,
     removeComment,
-  } = useComments(owner, repo, filePath);
+  } = useComments(commentTarget.owner, commentTarget.repo, filePath);
 
   const { selection, clearSelection } = useTextSelection(markdownRef);
   const positions = useAnchorPositions(comments, markdownRef);
+
+  const [forking, setForking] = useState(false);
 
   const handleAddComment = useCallback(
     async (selectedText: string, body: string) => {
@@ -64,15 +72,30 @@ export function DocumentViewer({
       );
       anchor.commitSha = commitSha;
 
-      await addNewComment({
+      const commentData = {
         author: { login: userLogin, avatarUrl: userAvatar },
         anchor,
         body,
-      });
+      };
 
+      if (!canWrite && !hasFork) {
+        // Need to fork first
+        setForking(true);
+        try {
+          await forkAndComment(owner, repo, filePath, commentData, branch);
+          // Reload to pick up fork state
+          window.location.reload();
+        } catch (error) {
+          console.error("Failed to fork and comment:", error);
+          setForking(false);
+        }
+        return;
+      }
+
+      await addNewComment(commentData);
       clearSelection();
     },
-    [content, addNewComment, clearSelection, userLogin, userAvatar]
+    [content, addNewComment, clearSelection, userLogin, userAvatar, canWrite, hasFork, owner, repo, filePath, branch, commitSha]
   );
 
   const handleHighlightClick = useCallback((commentId: string) => {
@@ -124,13 +147,23 @@ export function DocumentViewer({
             onReply={addNewReply}
             onResolve={toggleResolve}
             onDelete={removeComment}
-            canWrite={canWrite}
+            canWrite={canComment}
           />
         )}
       </div>
 
+      {/* Forking overlay */}
+      {forking && (
+        <div className="fixed inset-0 z-50 bg-black/20 flex items-center justify-center">
+          <div className="bg-white dark:bg-neutral-900 rounded-lg p-6 shadow-xl text-center">
+            <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
+            <p className="text-sm">Forking repository and saving comment...</p>
+          </div>
+        </div>
+      )}
+
       {/* Selection popover */}
-      {canWrite && (
+      {canComment && (
         <SelectionHandler
           selection={selection}
           onAddComment={handleAddComment}

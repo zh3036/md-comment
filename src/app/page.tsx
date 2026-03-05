@@ -77,6 +77,16 @@ export default async function LandingPage() {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-neutral-200 dark:border-neutral-800">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between text-xs text-neutral-400">
+          <span>md-comment</span>
+          <a href="/llms.txt" className="hover:text-neutral-600 dark:hover:text-neutral-300">
+            llms.txt
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }

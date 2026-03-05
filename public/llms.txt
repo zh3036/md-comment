@@ -1,0 +1,91 @@
+# md-comment
+
+> Google Docs-style comments on GitHub-hosted markdown files.
+
+md-comment lets you highlight text in any markdown file on GitHub and leave threaded comments. Comments are stored as JSON on an orphan branch (`md-comments`) in the same repo — no external database, fully portable, AI-readable.
+
+## Web App
+
+Paste a GitHub file URL after the app domain:
+
+  https://md-comment.fly.dev/owner/repo/blob/branch/path/to/file.md
+
+Or prepend the app URL to a full GitHub URL:
+
+  https://md-comment.fly.dev/https://github.com/owner/repo/blob/branch/file.md
+
+Sign in with GitHub OAuth. Select text and click "Add Comment" to comment.
+
+If you don't have write access to the repo, you can fork it and comment on your fork.
+
+## CLI
+
+The CLI tool is at `cli/md-comment.sh`. It requires a GitHub token via `GITHUB_TOKEN` env var or `gh auth login`.
+
+### Commands
+
+  md-comment list <owner/repo> <file-path>
+    List all comments on a file.
+
+  md-comment add <owner/repo> <file-path> --text "selected text" --body "comment body"
+    Add a comment anchored to the selected text.
+
+  md-comment reply <owner/repo> <file-path> --comment-id <id> --body "reply text"
+    Reply to an existing comment.
+
+  md-comment resolve <owner/repo> <file-path> --comment-id <id>
+    Resolve a comment thread.
+
+## Comment Storage Format
+
+Comments are stored on the `md-comments` orphan branch at:
+
+  comments/<file-path>.comments.json
+
+Each JSON file contains:
+
+  {
+    "metadata": {
+      "repo": "owner/repo",
+      "branch": "main",
+      "filePath": "path/to/file.md",
+      "url": "https://md-comment.fly.dev/owner/repo/blob/main/path/to/file.md"
+    },
+    "comments": [
+      {
+        "id": "uuid",
+        "author": { "login": "username", "avatarUrl": "..." },
+        "body": "Comment text",
+        "anchor": {
+          "selectedText": "the highlighted text",
+          "startOffset": 100,
+          "endOffset": 120,
+          "contextBefore": "text before selection",
+          "contextAfter": "text after selection",
+          "commitSha": "abc123"
+        },
+        "createdAt": "2025-01-01T00:00:00Z",
+        "resolved": false,
+        "replies": [
+          {
+            "id": "uuid",
+            "author": { "login": "username", "avatarUrl": "..." },
+            "body": "Reply text",
+            "createdAt": "2025-01-01T00:01:00Z"
+          }
+        ]
+      }
+    ]
+  }
+
+## Tech Stack
+
+- Next.js 15 (App Router), React 19, TypeScript
+- Auth.js v5 with GitHub OAuth
+- Octokit for GitHub API
+- SWR for data fetching
+- Tailwind CSS + shadcn/ui
+
+## Source Code
+
+https://github.com/zh3036/md-comment

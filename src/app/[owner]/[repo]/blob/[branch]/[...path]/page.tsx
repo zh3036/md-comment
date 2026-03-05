@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { createOctokit } from "@/lib/github/client";
 import { fetchFileContent, checkWriteAccess } from "@/lib/github/files";
+import { checkForkExists } from "@/lib/github/fork";
 import { DocumentViewer } from "@/components/document/document-viewer";
 import { FileSidebar } from "@/components/document/file-sidebar";
 import Link from "next/link";
@@ -26,9 +27,12 @@ export default async function DocumentPage({ params }: PageProps) {
   const filePath = path.join("/");
   const octokit = createOctokit(session.accessToken);
 
+  const userLogin = session.user.login ?? session.user.name ?? "anonymous";
+
   let fileContent: string;
   let canWrite: boolean;
   let commitSha: string;
+  let forkInfo: { owner: string; repo: string } | null = null;
 
   try {
     const [file, writeAccess] = await Promise.all([
@@ -38,6 +42,11 @@ export default async function DocumentPage({ params }: PageProps) {
     fileContent = file.content;
     canWrite = writeAccess;
     commitSha = file.commitSha;
+
+    // If user can't write, check if they have a fork
+    if (!canWrite && userLogin !== "anonymous") {
+      forkInfo = await checkForkExists(octokit, owner, repo, userLogin);
+    }
   } catch (error: unknown) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -92,19 +101,43 @@ export default async function DocumentPage({ params }: PageProps) {
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
-          {!canWrite && (
+          {!canWrite && !forkInfo && (
             <span className="text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-2 py-1 rounded">
               Read-only
+            </span>
+          )}
+          {!canWrite && forkInfo && (
+            <span className="text-xs bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 px-2 py-1 rounded">
+              Commenting on fork {forkInfo.owner}/{forkInfo.repo}
             </span>
           )}
           <span className="text-xs text-neutral-500">
             Branch: {branch}
           </span>
+          <a
+            href="/llms.txt"
+            className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+            title="LLM instructions"
+          >
+            llms.txt
+          </a>
         </div>
       </header>
 
+      {/* Fork banner */}
+      {!canWrite && !forkInfo && (
+        <div className="bg-blue-50 dark:bg-blue-950 border-b border-blue-200 dark:border-blue-800 px-6 py-2 text-sm text-blue-700 dark:text-blue-300 flex items-center justify-between">
+          <span>You don&apos;t have write access to {owner}/{repo}. Fork this repo to add comments.</span>
+        </div>
+      )}
+      {!canWrite && forkInfo && (
+        <div className="bg-blue-50 dark:bg-blue-950 border-b border-blue-200 dark:border-blue-800 px-6 py-2 text-sm text-blue-700 dark:text-blue-300">
+          Comments will be saved to your fork <strong>{forkInfo.owner}/{forkInfo.repo}</strong>
+        </div>
+      )}
+
       {/* Document viewer with file sidebar */}
-      <div className="flex h-[calc(100vh-64px)] relative">
+      <div className={`flex ${!canWrite ? "h-[calc(100vh-64px-36px)]" : "h-[calc(100vh-64px)]"} relative`}>
         <FileSidebar
           owner={owner}
           repo={repo}
@@ -120,8 +153,10 @@ export default async function DocumentPage({ params }: PageProps) {
             content={fileContent}
             commitSha={commitSha}
             canWrite={canWrite}
-            userLogin={session.user.login ?? session.user.name ?? "anonymous"}
+            userLogin={userLogin}
             userAvatar={session.user.image ?? ""}
+            commentTarget={forkInfo ?? { owner, repo }}
+            hasFork={!!forkInfo}
           />
         </div>
       </div>

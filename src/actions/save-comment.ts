@@ -5,6 +5,7 @@ import { createOctokit } from "@/lib/github/client";
 import { ensureCommentsBranch } from "@/lib/github/comments-branch";
 import { readComments, writeComments } from "@/lib/github/comments-crud";
 import type { Comment, CommentFile, CommentFileMetadata, CommentReply } from "@/lib/comments/types";
+import { forkRepo } from "@/lib/github/fork";
 import { v4 as uuidv4 } from "uuid";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://md-comment.fly.dev";
@@ -124,6 +125,48 @@ export async function resolveComment(
 
   const metadata = buildMetadata(owner, repo, filePath, branch);
   await writeComments(octokit, owner, repo, filePath, updated, sha, metadata);
+}
+
+export async function forkAndComment(
+  originalOwner: string,
+  originalRepo: string,
+  filePath: string,
+  comment: Omit<Comment, "id" | "createdAt" | "resolved" | "replies">,
+  branch?: string
+): Promise<{ comment: Comment; fork: { owner: string; repo: string } }> {
+  const session = await auth();
+  if (!session?.accessToken) {
+    throw new Error("Not authenticated");
+  }
+
+  const octokit = createOctokit(session.accessToken);
+  const fork = await forkRepo(octokit, originalOwner, originalRepo);
+
+  // Small delay to let GitHub process the fork
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  await ensureCommentsBranch(octokit, fork.owner, fork.repo);
+
+  const { data: existing, sha } = await readComments(octokit, fork.owner, fork.repo, filePath);
+
+  const newComment: Comment = {
+    ...comment,
+    id: uuidv4(),
+    createdAt: new Date().toISOString(),
+    resolved: false,
+    replies: [],
+  };
+
+  const updated: CommentFile = {
+    ...existing,
+    comments: [...existing.comments, newComment].sort(
+      (a, b) => a.anchor.startOffset - b.anchor.startOffset
+    ),
+  };
+
+  const metadata = buildMetadata(fork.owner, fork.repo, filePath, branch);
+  await writeComments(octokit, fork.owner, fork.repo, filePath, updated, sha, metadata);
+  return { comment: newComment, fork };
 }
 
 export async function deleteComment(
