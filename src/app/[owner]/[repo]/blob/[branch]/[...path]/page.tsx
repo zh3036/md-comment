@@ -5,6 +5,7 @@ import { fetchFileContent, checkWriteAccess } from "@/lib/github/files";
 import { checkForkExists } from "@/lib/github/fork";
 import { DocumentViewer } from "@/components/document/document-viewer";
 import { FileSidebar } from "@/components/document/file-sidebar";
+import { ForkBanner } from "@/components/document/fork-banner";
 import Link from "next/link";
 
 interface PageProps {
@@ -125,15 +126,14 @@ export default async function DocumentPage({ params }: PageProps) {
       </header>
 
       {/* Fork banner */}
-      {!canWrite && !forkInfo && (
-        <div className="bg-blue-50 dark:bg-blue-950 border-b border-blue-200 dark:border-blue-800 px-6 py-2 text-sm text-blue-700 dark:text-blue-300 flex items-center justify-between">
-          <span>You don&apos;t have write access to {owner}/{repo}. Fork this repo to add comments.</span>
-        </div>
-      )}
-      {!canWrite && forkInfo && (
-        <div className="bg-blue-50 dark:bg-blue-950 border-b border-blue-200 dark:border-blue-800 px-6 py-2 text-sm text-blue-700 dark:text-blue-300">
-          Comments will be saved to your fork <strong>{forkInfo.owner}/{forkInfo.repo}</strong>
-        </div>
+      {!canWrite && (
+        <ForkBanner
+          owner={owner}
+          repo={repo}
+          branch={branch}
+          filePath={filePath}
+          forkInfo={forkInfo}
+        />
       )}
 
       {/* Document viewer with file sidebar */}

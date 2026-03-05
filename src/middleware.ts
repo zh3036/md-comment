@@ -31,6 +31,28 @@ export default auth((req) => {
     return NextResponse.redirect(redirectUrl, 307);
   }
 
+  // Repo root: /owner/repo → /owner/repo/blob/main/README.md
+  const repoRootMatch = pathname.match(/^\/([^/]+)\/([^/]+)\/?$/);
+  if (repoRootMatch && !["api", "_next"].includes(repoRootMatch[1])) {
+    const redirectUrl = new URL(
+      `/${repoRootMatch[1]}/${repoRootMatch[2]}/blob/main/README.md`,
+      req.nextUrl.origin
+    );
+    return NextResponse.redirect(redirectUrl, 307);
+  }
+
+  // /tree/ URLs (folder browsing): /owner/repo/tree/branch/folder → /owner/repo/blob/branch/folder/README.md
+  const treeMatch = pathname.match(/^\/([^/]+)\/([^/]+)\/tree\/([^/]+)(\/.*)?$/);
+  if (treeMatch) {
+    const [, treeOwner, treeRepo, treeBranch, treePath] = treeMatch;
+    const folder = treePath ? treePath.replace(/\/$/, "") : "";
+    const redirectUrl = new URL(
+      `/${treeOwner}/${treeRepo}/blob/${treeBranch}${folder}/README.md`,
+      req.nextUrl.origin
+    );
+    return NextResponse.redirect(redirectUrl, 307);
+  }
+
   // Protect document routes (/:owner/:repo/blob/...) — require auth
   const isDocumentRoute = /^\/[^/]+\/[^/]+\/blob\//.test(pathname);
 
