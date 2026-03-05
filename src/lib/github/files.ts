@@ -76,6 +76,18 @@ export async function fetchFileContent(
 }
 
 /**
+ * Get the default branch for a repo (e.g. "main" or "master").
+ */
+export async function getDefaultBranch(
+  octokit: Octokit,
+  owner: string,
+  repo: string
+): Promise<string> {
+  const { data } = await octokit.repos.get({ owner, repo });
+  return data.default_branch;
+}
+
+/**
  * Check if the user has write access to the repo.
  */
 export async function checkWriteAccess(

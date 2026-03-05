@@ -29,7 +29,7 @@ export function CommentSidebar({
   // Separate active and resolved comments
   const activeComments = comments.filter((c) => !c.resolved);
   const resolvedComments = comments.filter((c) => c.resolved);
-  const orphanedComments = comments.filter((c) => {
+  const orphanedComments = activeComments.filter((c) => {
     const pos = positions.find((p) => p.commentId === c.id);
     return pos?.status === "orphaned";
   });

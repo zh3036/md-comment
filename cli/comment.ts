@@ -3,8 +3,8 @@
  * CLI tool for managing md-comment comments programmatically.
  *
  * Usage:
- *   npx tsx cli/comment.ts list <owner/repo> <file-path> [--branch main]
- *   npx tsx cli/comment.ts add <owner/repo> <file-path> --text "..." --body "..." [--branch main] [--author name]
+ *   npx tsx cli/comment.ts list <owner/repo> <file-path> [--branch <name>]
+ *   npx tsx cli/comment.ts add <owner/repo> <file-path> --text "..." --body "..." [--branch <name>] [--author name]
  *   npx tsx cli/comment.ts reply <owner/repo> <file-path> --id <id> --body "..." [--author name]
  *   npx tsx cli/comment.ts resolve <owner/repo> <file-path> --id <id>
  *
@@ -17,7 +17,6 @@ import { v4 as uuidv4 } from "uuid";
 import { ensureCommentsBranch } from "../src/lib/github/comments-branch";
 import { readComments, writeComments } from "../src/lib/github/comments-crud";
 import { createAnchor, findSelectionInRawMarkdown } from "../src/lib/anchoring/create-anchor";
-import { renderCommentsMarkdown } from "../src/lib/comments/render-markdown";
 import type { Comment, CommentFile, CommentFileMetadata } from "../src/lib/comments/types";
 
 // --- Arg parsing ---
@@ -264,7 +263,13 @@ async function main() {
 
   const { owner, repo } = parseOwnerRepo(positional[0]);
   const filePath = positional[1];
-  const branch = flags["branch"] || "main";
+
+  // Resolve branch: use --branch flag, or fetch the repo's default branch
+  let branch = flags["branch"];
+  if (!branch) {
+    const { data } = await octokit.repos.get({ owner, repo });
+    branch = data.default_branch;
+  }
 
   switch (command) {
     case "list":
@@ -312,8 +317,8 @@ async function main() {
 function printUsage() {
   console.log(`
 Usage:
-  npx tsx cli/comment.ts list <owner/repo> <file-path> [--branch main]
-  npx tsx cli/comment.ts add <owner/repo> <file-path> --text "..." --body "..." [--branch main] [--author name]
+  npx tsx cli/comment.ts list <owner/repo> <file-path> [--branch <name>]
+  npx tsx cli/comment.ts add <owner/repo> <file-path> --text "..." --body "..." [--branch <name>] [--author name]
   npx tsx cli/comment.ts reply <owner/repo> <file-path> --id <id> --body "..." [--author name]
   npx tsx cli/comment.ts resolve <owner/repo> <file-path> --id <id>
 
