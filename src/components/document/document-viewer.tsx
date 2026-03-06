@@ -35,6 +35,7 @@ export function DocumentViewer({
 }: DocumentViewerProps) {
   const markdownRef = useRef<HTMLDivElement>(null);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const {
     comments,
@@ -64,15 +65,24 @@ export function DocumentViewer({
       );
       anchor.commitSha = commitSha;
 
-      await addNewComment({
-        author: { login: userLogin, avatarUrl: userAvatar },
-        anchor,
-        body,
-      });
-
-      clearSelection();
+      try {
+        await addNewComment({
+          author: { login: userLogin, avatarUrl: userAvatar },
+          anchor,
+          body,
+        });
+        clearSelection();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to save comment";
+        if (msg.includes("OAuth App access restrictions")) {
+          setErrorMsg(`This organization restricts third-party app access. An org admin must approve the md-comment app at github.com/orgs/${owner}/settings/oauth_application_policy`);
+        } else {
+          setErrorMsg(msg);
+        }
+        setTimeout(() => setErrorMsg(null), 8000);
+      }
     },
-    [content, addNewComment, clearSelection, userLogin, userAvatar]
+    [content, addNewComment, clearSelection, userLogin, userAvatar, owner, commitSha]
   );
 
   const handleHighlightClick = useCallback((commentId: string) => {
@@ -124,19 +134,25 @@ export function DocumentViewer({
             onReply={addNewReply}
             onResolve={toggleResolve}
             onDelete={removeComment}
-            canWrite={canWrite}
+            canWrite={true}
           />
         )}
       </div>
 
-      {/* Selection popover */}
-      {canWrite && (
-        <SelectionHandler
-          selection={selection}
-          onAddComment={handleAddComment}
-          onDismiss={clearSelection}
-        />
+      {/* Error banner */}
+      {errorMsg && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg shadow-lg text-sm">
+          {errorMsg}
+          <button onClick={() => setErrorMsg(null)} className="ml-3 font-bold">&times;</button>
+        </div>
       )}
+
+      {/* Selection popover */}
+      <SelectionHandler
+        selection={selection}
+        onAddComment={handleAddComment}
+        onDismiss={clearSelection}
+      />
     </div>
   );
 }

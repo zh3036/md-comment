@@ -4,7 +4,10 @@ import { auth } from "@/auth";
 import { createOctokit } from "@/lib/github/client";
 import { ensureCommentsBranch } from "@/lib/github/comments-branch";
 import { readComments, writeComments } from "@/lib/github/comments-crud";
+import { checkWriteAccess } from "@/lib/github/files";
+import { checkForkExists, forkRepo } from "@/lib/github/fork";
 import type { Comment, CommentFile, CommentFileMetadata, CommentReply } from "@/lib/comments/types";
+import type { Octokit } from "@octokit/rest";
 import { v4 as uuidv4 } from "uuid";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://md-comment.fly.dev";
@@ -24,6 +27,29 @@ function buildMetadata(
   };
 }
 
+/**
+ * Resolve the target repo for comments: original repo if writable, otherwise user's fork.
+ */
+async function resolveCommentTarget(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  userLogin: string
+): Promise<{ owner: string; repo: string }> {
+  const canWrite = await checkWriteAccess(octokit, owner, repo);
+  if (canWrite) return { owner, repo };
+
+  // Check for existing fork
+  const fork = await checkForkExists(octokit, owner, repo, userLogin);
+  if (fork) return fork;
+
+  // Create fork
+  const newFork = await forkRepo(octokit, owner, repo);
+  // Small delay to let GitHub process the fork
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  return newFork;
+}
+
 export async function addComment(
   owner: string,
   repo: string,
@@ -37,9 +63,12 @@ export async function addComment(
   }
 
   const octokit = createOctokit(session.accessToken);
-  await ensureCommentsBranch(octokit, owner, repo);
+  const userLogin = session.user.login ?? session.user.name ?? "anonymous";
+  const target = await resolveCommentTarget(octokit, owner, repo, userLogin);
 
-  const { data: existing, sha } = await readComments(octokit, owner, repo, filePath);
+  await ensureCommentsBranch(octokit, target.owner, target.repo);
+
+  const { data: existing, sha } = await readComments(octokit, target.owner, target.repo, filePath);
 
   const newComment: Comment = {
     ...comment,
@@ -57,7 +86,7 @@ export async function addComment(
   };
 
   const metadata = buildMetadata(owner, repo, filePath, branch);
-  await writeComments(octokit, owner, repo, filePath, updated, sha, metadata);
+  await writeComments(octokit, target.owner, target.repo, filePath, updated, sha, metadata);
   return newComment;
 }
 
@@ -75,7 +104,10 @@ export async function addReply(
   }
 
   const octokit = createOctokit(session.accessToken);
-  const { data: existing, sha } = await readComments(octokit, owner, repo, filePath);
+  const userLogin = session.user.login ?? session.user.name ?? "anonymous";
+  const target = await resolveCommentTarget(octokit, owner, repo, userLogin);
+
+  const { data: existing, sha } = await readComments(octokit, target.owner, target.repo, filePath);
 
   const reply: CommentReply = {
     id: uuidv4(),
@@ -95,7 +127,7 @@ export async function addReply(
   };
 
   const metadata = buildMetadata(owner, repo, filePath, branch);
-  await writeComments(octokit, owner, repo, filePath, updated, sha, metadata);
+  await writeComments(octokit, target.owner, target.repo, filePath, updated, sha, metadata);
   return reply;
 }
 
@@ -113,7 +145,10 @@ export async function resolveComment(
   }
 
   const octokit = createOctokit(session.accessToken);
-  const { data: existing, sha } = await readComments(octokit, owner, repo, filePath);
+  const userLogin = session.user.login ?? session.user.name ?? "anonymous";
+  const target = await resolveCommentTarget(octokit, owner, repo, userLogin);
+
+  const { data: existing, sha } = await readComments(octokit, target.owner, target.repo, filePath);
 
   const updated: CommentFile = {
     ...existing,
@@ -123,7 +158,7 @@ export async function resolveComment(
   };
 
   const metadata = buildMetadata(owner, repo, filePath, branch);
-  await writeComments(octokit, owner, repo, filePath, updated, sha, metadata);
+  await writeComments(octokit, target.owner, target.repo, filePath, updated, sha, metadata);
 }
 
 export async function deleteComment(
@@ -139,7 +174,10 @@ export async function deleteComment(
   }
 
   const octokit = createOctokit(session.accessToken);
-  const { data: existing, sha } = await readComments(octokit, owner, repo, filePath);
+  const userLogin = session.user.login ?? session.user.name ?? "anonymous";
+  const target = await resolveCommentTarget(octokit, owner, repo, userLogin);
+
+  const { data: existing, sha } = await readComments(octokit, target.owner, target.repo, filePath);
 
   const updated: CommentFile = {
     ...existing,
@@ -147,5 +185,5 @@ export async function deleteComment(
   };
 
   const metadata = buildMetadata(owner, repo, filePath, branch);
-  await writeComments(octokit, owner, repo, filePath, updated, sha, metadata);
+  await writeComments(octokit, target.owner, target.repo, filePath, updated, sha, metadata);
 }
