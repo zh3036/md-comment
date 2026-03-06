@@ -15,6 +15,14 @@ interface PageProps {
   }>;
 }
 
+export async function generateMetadata({ params }: PageProps) {
+  const { owner, repo, path } = await params;
+  const fileName = path[path.length - 1];
+  return {
+    title: `${fileName} · ${owner}/${repo}`,
+  };
+}
+
 export default async function DocumentPage({ params }: PageProps) {
   const { owner, repo, branch, path } = await params;
   const session = await auth();
