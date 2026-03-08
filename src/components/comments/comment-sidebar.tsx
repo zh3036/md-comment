@@ -51,7 +51,7 @@ export function CommentSidebar({
         {/* Active comments positioned relative to their anchors */}
         {activeComments.length === 0 && (
           <p className="text-sm text-neutral-400 text-center py-8">
-            Select text to add a comment
+            {canWrite ? "Select text to add a comment" : "No comments yet"}
           </p>
         )}
 

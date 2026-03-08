@@ -22,10 +22,9 @@ interface UseCommentsReturn {
 export function useComments(
   owner: string,
   repo: string,
-  filePath: string,
-  enabled: boolean = true
+  filePath: string
 ): UseCommentsReturn {
-  const key = enabled ? `comments:${owner}/${repo}/${filePath}` : null;
+  const key = `comments:${owner}/${repo}/${filePath}`;
 
   const { data, error, isLoading, mutate } = useSWR<{
     data: CommentFile;
