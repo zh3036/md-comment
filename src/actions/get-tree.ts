@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import { createOctokit } from "@/lib/github/client";
+import { createOctokit, createPublicOctokit } from "@/lib/github/client";
 import { fetchRepoTree, type TreeNode } from "@/lib/github/tree";
 
 export async function getTree(
@@ -10,10 +10,9 @@ export async function getTree(
   branch: string
 ): Promise<TreeNode[]> {
   const session = await auth();
-  if (!session?.accessToken) {
-    throw new Error("Not authenticated");
-  }
+  const octokit = session?.accessToken
+    ? createOctokit(session.accessToken)
+    : createPublicOctokit();
 
-  const octokit = createOctokit(session.accessToken);
   return fetchRepoTree(octokit, owner, repo, branch);
 }

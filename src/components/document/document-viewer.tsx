@@ -18,6 +18,7 @@ interface DocumentViewerProps {
   content: string;
   commitSha: string;
   canWrite: boolean;
+  isAuthenticated: boolean;
   userLogin: string;
   userAvatar: string;
 }
@@ -30,6 +31,7 @@ export function DocumentViewer({
   content,
   commitSha,
   canWrite,
+  isAuthenticated,
   userLogin,
   userAvatar,
 }: DocumentViewerProps) {
@@ -44,7 +46,7 @@ export function DocumentViewer({
     addNewReply,
     toggleResolve,
     removeComment,
-  } = useComments(owner, repo, filePath);
+  } = useComments(owner, repo, filePath, isAuthenticated);
 
   const { selection, clearSelection } = useTextSelection(markdownRef);
   const positions = useAnchorPositions(comments, markdownRef);
@@ -103,41 +105,45 @@ export function DocumentViewer({
 
   return (
     <div className="flex h-full">
-      {/* Markdown content — 65% */}
-      <div className="flex-1 overflow-auto" style={{ flex: "0 0 65%" }}>
+      {/* Markdown content — full width when not authenticated, 65% otherwise */}
+      <div className="flex-1 overflow-auto" style={{ flex: isAuthenticated ? "0 0 65%" : "1 1 100%" }}>
         <div
           ref={markdownRef}
           className="max-w-4xl mx-auto px-8 py-6 relative"
           onClick={() => setActiveCommentId(null)}
         >
           <MarkdownRenderer content={content} />
-          <HighlightLayer
-            comments={comments}
-            rawMarkdown={content}
-            containerRef={markdownRef}
-            activeCommentId={activeCommentId}
-            onHighlightClick={handleHighlightClick}
-          />
+          {isAuthenticated && (
+            <HighlightLayer
+              comments={comments}
+              rawMarkdown={content}
+              containerRef={markdownRef}
+              activeCommentId={activeCommentId}
+              onHighlightClick={handleHighlightClick}
+            />
+          )}
         </div>
       </div>
 
-      {/* Comment sidebar — 35% */}
-      <div className="border-l border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950" style={{ flex: "0 0 35%" }}>
-        {isLoading ? (
-          <div className="p-4 text-sm text-neutral-400">Loading comments...</div>
-        ) : (
-          <CommentSidebar
-            comments={comments}
-            positions={positions}
-            activeCommentId={activeCommentId}
-            onCommentClick={handleSidebarCommentClick}
-            onReply={addNewReply}
-            onResolve={toggleResolve}
-            onDelete={removeComment}
-            canWrite={true}
-          />
-        )}
-      </div>
+      {/* Comment sidebar — only when authenticated */}
+      {isAuthenticated && (
+        <div className="border-l border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950" style={{ flex: "0 0 35%" }}>
+          {isLoading ? (
+            <div className="p-4 text-sm text-neutral-400">Loading comments...</div>
+          ) : (
+            <CommentSidebar
+              comments={comments}
+              positions={positions}
+              activeCommentId={activeCommentId}
+              onCommentClick={handleSidebarCommentClick}
+              onReply={addNewReply}
+              onResolve={toggleResolve}
+              onDelete={removeComment}
+              canWrite={true}
+            />
+          )}
+        </div>
+      )}
 
       {/* Error banner */}
       {errorMsg && (
@@ -147,12 +153,14 @@ export function DocumentViewer({
         </div>
       )}
 
-      {/* Selection popover */}
-      <SelectionHandler
-        selection={selection}
-        onAddComment={handleAddComment}
-        onDismiss={clearSelection}
-      />
+      {/* Selection popover — only when authenticated */}
+      {isAuthenticated && (
+        <SelectionHandler
+          selection={selection}
+          onAddComment={handleAddComment}
+          onDismiss={clearSelection}
+        />
+      )}
     </div>
   );
 }

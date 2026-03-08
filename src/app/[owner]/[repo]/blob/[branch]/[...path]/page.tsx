@@ -1,6 +1,5 @@
 import { auth } from "@/auth";
-import { redirect } from "next/navigation";
-import { createOctokit } from "@/lib/github/client";
+import { createOctokit, createPublicOctokit } from "@/lib/github/client";
 import { fetchFileContent, checkWriteAccess } from "@/lib/github/files";
 import { DocumentViewer } from "@/components/document/document-viewer";
 import { FileSidebar } from "@/components/document/file-sidebar";
@@ -27,36 +26,57 @@ export default async function DocumentPage({ params }: PageProps) {
   const { owner, repo, branch, path } = await params;
   const session = await auth();
 
-  if (!session?.accessToken) {
-    redirect("/api/auth/signin");
-  }
+  const accessToken = session?.accessToken;
+  const isAuthenticated = !!accessToken;
+  const octokit = accessToken
+    ? createOctokit(accessToken)
+    : createPublicOctokit();
 
   const filePath = path.join("/");
-  const octokit = createOctokit(session.accessToken);
 
   let fileContent: string;
-  let canWrite: boolean;
+  let canWrite = false;
   let commitSha: string;
 
   try {
-    const [file, writeAccess] = await Promise.all([
-      fetchFileContent(octokit, owner, repo, filePath, branch),
-      checkWriteAccess(octokit, owner, repo),
-    ]);
-    fileContent = file.content;
-    canWrite = writeAccess;
-    commitSha = file.commitSha;
+    const results = isAuthenticated
+      ? await Promise.all([
+          fetchFileContent(octokit, owner, repo, filePath, branch),
+          checkWriteAccess(octokit, owner, repo),
+        ])
+      : [await fetchFileContent(octokit, owner, repo, filePath, branch), false] as const;
+
+    fileContent = results[0].content;
+    canWrite = results[1] as boolean;
+    commitSha = results[0].commitSha;
   } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    const isAuthError =
+      !isAuthenticated &&
+      (message.includes("Not Found") || (typeof error === "object" && error !== null && "status" in error && error.status === 404));
+
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">File Not Found</h1>
+          <h1 className="text-2xl font-bold mb-2">
+            {isAuthError ? "Private or Not Found" : "File Not Found"}
+          </h1>
           <p className="text-neutral-500 mb-4">
             Could not load {owner}/{repo}/{filePath} on branch {branch}
           </p>
-          <p className="text-sm text-neutral-400">
-            {error instanceof Error ? error.message : "Unknown error"}
-          </p>
+          {isAuthError ? (
+            <p className="text-sm text-neutral-400 mb-4">
+              This repo may be private.{" "}
+              <Link href="/api/auth/signin" className="text-blue-500 hover:underline">
+                Sign in with GitHub
+              </Link>{" "}
+              to access it.
+            </p>
+          ) : (
+            <p className="text-sm text-neutral-400">
+              {message}
+            </p>
+          )}
           <Link href="/" className="text-blue-500 hover:underline mt-4 inline-block">
             Go home
           </Link>
@@ -100,7 +120,15 @@ export default async function DocumentPage({ params }: PageProps) {
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
-          {!canWrite && (
+          {!isAuthenticated && (
+            <Link
+              href="/api/auth/signin"
+              className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded hover:bg-blue-600 transition-colors"
+            >
+              Sign in to comment
+            </Link>
+          )}
+          {isAuthenticated && !canWrite && (
             <span className="text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-2 py-1 rounded">
               Read-only
             </span>
@@ -128,8 +156,9 @@ export default async function DocumentPage({ params }: PageProps) {
             content={fileContent}
             commitSha={commitSha}
             canWrite={canWrite}
-            userLogin={session.user.login ?? session.user.name ?? "anonymous"}
-            userAvatar={session.user.image ?? ""}
+            isAuthenticated={isAuthenticated}
+            userLogin={session?.user?.login ?? session?.user?.name ?? "anonymous"}
+            userAvatar={session?.user?.image ?? ""}
           />
         </div>
       </div>
